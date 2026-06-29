@@ -15,45 +15,30 @@ GROUP_ID = int(os.getenv("GROUP_ID", "0"))
 TZ = pytz.timezone("Europe/Istanbul")
 
 # =========================
-# DATABASE SETUP
+# DATABASE
 # =========================
 conn = sqlite3.connect("bot.db", check_same_thread=False)
 c = conn.cursor()
 
-c.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    name TEXT,
-    added_date TEXT
-)
-""")
+c.execute("""CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY, name TEXT, added_date TEXT
+)""")
 
-c.execute("""
-CREATE TABLE IF NOT EXISTS donations (
-    user_id TEXT,
-    week TEXT,
-    month TEXT,
-    date TEXT
-)
-""")
+c.execute("""CREATE TABLE IF NOT EXISTS donations (
+    user_id TEXT, week TEXT, month TEXT, date TEXT
+)""")
 
-c.execute("""
-CREATE TABLE IF NOT EXISTS weekly_snapshots (
-    week TEXT PRIMARY KEY,
-    snapshot TEXT,
-    created_at TEXT
-)
-""")
+c.execute("""CREATE TABLE IF NOT EXISTS weekly_snapshots (
+    week TEXT PRIMARY KEY, snapshot TEXT, created_at TEXT
+)""")
 
 conn.commit()
 
-
 # =========================
-# YARDIMCI FONKSİYONLAR
+# YARDIMCI
 # =========================
 def get_week_key():
-    now = datetime.now(TZ)
-    return now.strftime("%Y-W%W")
+    return datetime.now(TZ).strftime("%Y-W%W")
 
 def get_month_key():
     return datetime.now(TZ).strftime("%Y-%m")
@@ -77,13 +62,12 @@ def get_month_donors(month=None):
     c.execute("SELECT DISTINCT user_id FROM donations WHERE month=?", (month,))
     return set(row[0] for row in c.fetchall())
 
-
 # =========================
-# BAĞIŞ ALGILAMA
+# BAGIS ALGILAMA
 # =========================
 def normalize(text):
     replacements = {
-        'İ': 'i', 'I': 'i', 'Ğ': 'g', 'Ü': 'u',
+        'I': 'i', 'İ': 'i', 'Ğ': 'g', 'Ü': 'u',
         'Ş': 's', 'Ö': 'o', 'Ç': 'c',
         'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c', 'ı': 'i'
     }
@@ -110,9 +94,8 @@ def is_donation_message(text, has_photo):
                 return True
     return False
 
-
 # =========================
-# KAYIT FONKSİYONLARI
+# KAYIT
 # =========================
 def user_kaydet(uid, name):
     now = datetime.now(TZ).strftime("%Y-%m-%d")
@@ -130,7 +113,6 @@ def bagis_ekle(uid):
         return True
     return False
 
-
 # =========================
 # MESAJ HANDLER
 # =========================
@@ -141,7 +123,6 @@ async def mesaj(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     uid = str(user.id)
     name = user.username or user.first_name
-
     text = update.message.text or update.message.caption or ""
     has_photo = bool(update.message.photo)
 
@@ -155,54 +136,41 @@ async def mesaj(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if yeni:
             await update.message.reply_text(f"✅ @{name} bu haftaki bağışın kaydedildi!")
 
-
 # =========================
-# /start
+# KOMUTLAR
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🤖 *Bağış Takip Botu Aktif*\n\n"
-        "📌 Komutlar:\n"
         "/hafta — Bu haftanın durumu\n"
         "/ay — Bu ayın özeti\n"
-        "/rapor — Detaylı haftalık rapor\n"
+        "/rapor — Detaylı rapor\n"
         "/uyeler — Tüm üyeler\n"
         "/panel — Admin paneli\n"
-        "/uyeekle [id] [isim] — Üye ekle (admin)\n"
-        "/uyesil [id] — Üye sil (admin)\n"
-        "/bagisekle [id] — Manuel bağış ekle (admin)\n"
-        "/bagissil [id] — Bu haftaki bağışı sil (admin)\n"
-        "/sifirla — Haftalık sıfırla (admin)",
+        "/uyeekle [id] [isim]\n"
+        "/uyesil [id]\n"
+        "/bagisekle [id]\n"
+        "/bagissil [id]\n"
+        "/sifirla",
         parse_mode="Markdown"
     )
 
-
-# =========================
-# /hafta
-# =========================
 async def hafta(update: Update, context: ContextTypes.DEFAULT_TYPE):
     users = get_all_users()
     donors = get_week_donors()
     yapanlar = [u for u in users if u[0] in donors]
     yapmayanlar = [u for u in users if u[0] not in donors]
-    week = get_week_key()
 
-    msg = f"📊 *{week} — HAFTALIK DURUM*\n\n"
+    msg = f"📊 *{get_week_key()} — HAFTALIK DURUM*\n\n"
     msg += f"✅ *YAPANLAR ({len(yapanlar)}/{len(users)}):*\n"
     msg += "\n".join([f"  • {u[1]}" for u in yapanlar]) if yapanlar else "  —"
     msg += f"\n\n❌ *YAPMAYANLAR ({len(yapmayanlar)}):*\n"
     msg += "\n".join([f"  • {u[1]}" for u in yapmayanlar]) if yapmayanlar else "  —"
-
     await update.message.reply_text(msg, parse_mode="Markdown")
 
-
-# =========================
-# /ay
-# =========================
 async def ay(update: Update, context: ContextTypes.DEFAULT_TYPE):
     users = get_all_users()
     month = get_month_key()
-
     c.execute("SELECT user_id, COUNT(*) FROM donations WHERE month=? GROUP BY user_id", (month,))
     rows = {r[0]: r[1] for r in c.fetchall()}
 
@@ -211,52 +179,35 @@ async def ay(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sayi = rows.get(u[0], 0)
         emoji = "✅" if sayi > 0 else "❌"
         msg += f"{emoji} {u[1]}: {sayi} bağış\n"
-
     await update.message.reply_text(msg, parse_mode="Markdown")
 
-
-# =========================
-# /rapor
-# =========================
 async def rapor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     users = get_all_users()
     donors = get_week_donors()
     yapanlar = [u for u in users if u[0] in donors]
     yapmayanlar = [u for u in users if u[0] not in donors]
-    week = get_week_key()
     yuzde = int(len(yapanlar) / len(users) * 100) if users else 0
 
     msg = f"📋 *DETAYLI HAFTALIK RAPOR*\n"
-    msg += f"📅 Hafta: {week}\n"
-    msg += f"📈 Tamamlama: {len(yapanlar)}/{len(users)} (%{yuzde})\n\n"
-    msg += f"✅ *BAĞIŞ YAPANLAR:*\n"
+    msg += f"📅 Hafta: {get_week_key()} | 📈 %{yuzde}\n\n"
+    msg += f"✅ *YAPANLAR:*\n"
     msg += "\n".join([f"  {i+1}. {u[1]}" for i, u in enumerate(yapanlar)]) if yapanlar else "  —"
-    msg += f"\n\n❌ *BAĞIŞ YAPMAYANLAR:*\n"
+    msg += f"\n\n❌ *YAPMAYANLAR:*\n"
     msg += "\n".join([f"  {i+1}. {u[1]}" for i, u in enumerate(yapmayanlar)]) if yapmayanlar else "  —"
-
     await update.message.reply_text(msg, parse_mode="Markdown")
 
-
-# =========================
-# /uyeler
-# =========================
 async def uyeler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     users = get_all_users()
     if not users:
         await update.message.reply_text("Henüz kayıtlı üye yok.")
         return
-
     msg = f"👥 *KAYITLI ÜYELER ({len(users)} kişi)*\n\n"
     msg += "\n".join([f"  {i+1}. {u[1]} (`{u[0]}`)" for i, u in enumerate(users)])
     await update.message.reply_text(msg, parse_mode="Markdown")
 
-
-# =========================
-# /panel
-# =========================
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id):
-        await update.message.reply_text("⛔ Bu komut sadece adminlere özeldir.")
+        await update.message.reply_text("⛔ Yetkisiz.")
         return
 
     users = get_all_users()
@@ -266,132 +217,93 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     yapmayanlar = [u for u in users if u[0] not in week_donors]
 
     msg = f"🛠 *ADMİN PANELİ*\n━━━━━━━━━━━━━━━━━━━━\n"
-    msg += f"👥 Toplam üye: {len(users)}\n"
-    msg += f"📅 Hafta: {get_week_key()}\n"
-    msg += f"📆 Ay: {get_month_key()}\n"
-    msg += f"✅ Bu hafta yapan: {len(yapanlar)}\n"
-    msg += f"❌ Bu hafta yapmayan: {len(yapmayanlar)}\n"
+    msg += f"👥 Toplam: {len(users)} | ✅ Yapan: {len(yapanlar)} | ❌ Yapmayan: {len(yapmayanlar)}\n"
+    msg += f"📅 Hafta: {get_week_key()} | 📆 Ay: {get_month_key()}\n"
     msg += f"📊 Bu ay tekil bağışçı: {len(month_donors)}\n"
     msg += f"━━━━━━━━━━━━━━━━━━━━\n\n"
     msg += f"✅ *YAPANLAR:*\n"
     msg += "\n".join([f"  • {u[1]} (`{u[0]}`)" for u in yapanlar]) if yapanlar else "  —"
     msg += f"\n\n❌ *YAPMAYANLAR:*\n"
     msg += "\n".join([f"  • {u[1]} (`{u[0]}`)" for u in yapmayanlar]) if yapmayanlar else "  —"
-
     await update.message.reply_text(msg, parse_mode="Markdown")
 
-
-# =========================
-# /uyeekle
-# =========================
 async def uyeekle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id):
         await update.message.reply_text("⛔ Yetkisiz.")
         return
-
     args = context.args
     if len(args) < 2:
-        await update.message.reply_text("Kullanım: /uyeekle [telegram_id] [isim]")
+        await update.message.reply_text("Kullanım: /uyeekle [id] [isim]")
         return
-
-    uid = args[0]
-    name = " ".join(args[1:])
+    uid, name = args[0], " ".join(args[1:])
     user_kaydet(uid, name)
-    await update.message.reply_text(f"✅ {name} (`{uid}`) sisteme eklendi.", parse_mode="Markdown")
+    await update.message.reply_text(f"✅ {name} (`{uid}`) eklendi.", parse_mode="Markdown")
 
-
-# =========================
-# /uyesil
-# =========================
 async def uyesil(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id):
         await update.message.reply_text("⛔ Yetkisiz.")
         return
-
     args = context.args
     if not args:
-        await update.message.reply_text("Kullanım: /uyesil [telegram_id]")
+        await update.message.reply_text("Kullanım: /uyesil [id]")
         return
-
     uid = args[0]
     c.execute("SELECT name FROM users WHERE id=?", (uid,))
     row = c.fetchone()
     if not row:
-        await update.message.reply_text("❌ Kullanıcı bulunamadı.")
+        await update.message.reply_text("❌ Bulunamadı.")
         return
-
     c.execute("DELETE FROM users WHERE id=?", (uid,))
     c.execute("DELETE FROM donations WHERE user_id=?", (uid,))
     conn.commit()
-    await update.message.reply_text(f"🗑 {row[0]} sistemden silindi.")
+    await update.message.reply_text(f"🗑 {row[0]} silindi.")
 
-
-# =========================
-# /bagisekle
-# =========================
 async def bagisekle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id):
         await update.message.reply_text("⛔ Yetkisiz.")
         return
-
     args = context.args
     if not args:
-        await update.message.reply_text("Kullanım: /bagisekle [telegram_id]")
+        await update.message.reply_text("Kullanım: /bagisekle [id]")
         return
-
     uid = args[0]
     c.execute("SELECT name FROM users WHERE id=?", (uid,))
     row = c.fetchone()
     if not row:
         await update.message.reply_text("❌ Kullanıcı bulunamadı.")
         return
-
     yeni = bagis_ekle(uid)
     if yeni:
-        await update.message.reply_text(f"✅ {row[0]} için bu haftaki bağış eklendi.")
+        await update.message.reply_text(f"✅ {row[0]} için bağış eklendi.")
     else:
-        await update.message.reply_text(f"ℹ️ {row[0]} zaten bu hafta bağış yapmış.")
+        await update.message.reply_text(f"ℹ️ {row[0]} zaten bu hafta yapmış.")
 
-
-# =========================
-# /bagissil
-# =========================
 async def bagissil(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id):
         await update.message.reply_text("⛔ Yetkisiz.")
         return
-
     args = context.args
     if not args:
-        await update.message.reply_text("Kullanım: /bagissil [telegram_id]")
+        await update.message.reply_text("Kullanım: /bagissil [id]")
         return
-
     uid = args[0]
-    week = get_week_key()
-    c.execute("DELETE FROM donations WHERE user_id=? AND week=?", (uid, week))
+    c.execute("DELETE FROM donations WHERE user_id=? AND week=?", (uid, get_week_key()))
     conn.commit()
     await update.message.reply_text(f"🗑 `{uid}` için bu haftaki bağış silindi.", parse_mode="Markdown")
 
-
-# =========================
-# /sifirla
-# =========================
 async def sifirla(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id):
         await update.message.reply_text("⛔ Yetkisiz.")
         return
-
-    await haftalik_sifirla(context)
-    await update.message.reply_text("✅ Haftalık bağışlar sıfırlandı.")
-
+    await haftalik_rapor_gonder(context)
+    await update.message.reply_text("✅ Rapor gönderildi ve hafta sıfırlandı.")
 
 # =========================
-# PAZAR HATIRLATMASI
+# PAZAR 18:00 — ETİKETLİ UYARI
 # =========================
 async def pazar_hatirlatma(context: ContextTypes.DEFAULT_TYPE):
     if not GROUP_ID:
         return
-
     users = get_all_users()
     donors = get_week_donors()
     yapmayanlar = [u for u in users if u[0] not in donors]
@@ -411,19 +323,20 @@ async def pazar_hatirlatma(context: ContextTypes.DEFAULT_TYPE):
     )
     await context.bot.send_message(chat_id=GROUP_ID, text=msg, parse_mode="Markdown")
 
-
 # =========================
-# HAFTALIK SIFIRLA
+# PAZAR 23:50 — RAPOR ADMİNE
 # =========================
-async def haftalik_sifirla(context: ContextTypes.DEFAULT_TYPE):
+async def haftalik_rapor_gonder(context: ContextTypes.DEFAULT_TYPE):
     users = get_all_users()
     week = get_week_key()
     donors = get_week_donors(week)
     yapanlar = [u for u in users if u[0] in donors]
     yapmayanlar = [u for u in users if u[0] not in donors]
+    yuzde = int(len(yapanlar) / len(users) * 100) if users else 0
 
     snapshot = (
-        f"📋 *{week} — HAFTA SONU RAPORU*\n\n"
+        f"📋 *{week} — HAFTA SONU RAPORU*\n"
+        f"📈 Tamamlama: {len(yapanlar)}/{len(users)} (%{yuzde})\n\n"
         f"✅ Bağış Yapanlar ({len(yapanlar)}):\n"
         + ("\n".join([f"  • {u[1]}" for u in yapanlar]) or "  —")
         + f"\n\n❌ Bağış Yapmayanlar ({len(yapmayanlar)}):\n"
@@ -438,18 +351,25 @@ async def haftalik_sifirla(context: ContextTypes.DEFAULT_TYPE):
         try:
             await context.bot.send_message(
                 chat_id=admin_id,
-                text="🔔 *Haftalık Sıfırlama Öncesi Son Rapor:*\n\n" + snapshot,
+                text="🔔 *Pazar 23:50 — Haftalık Son Rapor:*\n\n" + snapshot,
                 parse_mode="Markdown"
             )
         except Exception:
             pass
 
-    if GROUP_ID:
+# =========================
+# PAZARTESİ 00:00 — SIFIRLA
+# =========================
+async def haftalik_sifirla(context: ContextTypes.DEFAULT_TYPE):
+    for admin_id in ADMIN_IDS:
         try:
-            await context.bot.send_message(chat_id=GROUP_ID, text=snapshot, parse_mode="Markdown")
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text="🔄 *Yeni hafta başladı!* Bağış takibi sıfırlandı.",
+                parse_mode="Markdown"
+            )
         except Exception:
             pass
-
 
 # =========================
 # ZAMANLAYICILAR
@@ -464,20 +384,19 @@ def schedule_jobs(app):
         days=(6,)
     )
 
-    # Pazar 23:50 — son raporu adminlere ve gruba gönder
+    # Pazar 23:50 — raporu adminlere gönder
     jq.run_daily(
         haftalik_rapor_gonder,
         time=datetime.strptime("23:50", "%H:%M").replace(tzinfo=TZ).timetz(),
         days=(6,)
     )
 
-    # Pazartesi 00:00 — haftalık sıfırla
+    # Pazartesi 00:00 — sıfırla
     jq.run_daily(
         haftalik_sifirla,
         time=datetime.strptime("00:00", "%H:%M").replace(tzinfo=TZ).timetz(),
         days=(0,)
     )
-
 
 # =========================
 # ANA UYGULAMA
@@ -502,4 +421,4 @@ schedule_jobs(app)
 
 print("✅ Bot başlatıldı.")
 app.run_polling()
-                  
+    
