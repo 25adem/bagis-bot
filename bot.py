@@ -202,7 +202,7 @@ async def uyeler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Henüz kayıtlı üye yok.")
         return
     msg = f"👥 *KAYITLI ÜYELER ({len(users)} kişi)*\n\n"
-    msg += "\n".join([f"  {i+1}. {u[1]} (`{u[0]}`)" for i, u in enumerate(users)])
+    msg += "\n".join([f"  {i+1}. @{u[1]} (`{u[0]}`)" for i, u in enumerate(users)])
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
