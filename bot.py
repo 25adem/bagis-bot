@@ -145,28 +145,15 @@ async def mesaj(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text or update.message.caption or ""
     has_photo = bool(update.message.photo)
 
-    # Kayıtlı değilse ID'yi söyle
+    # Kayıtlı değilse işlem yapma
     c.execute("SELECT 1 FROM users WHERE id=?", (uid,))
     if not c.fetchone():
-        await update.message.reply_text(
-            f"⚠️ Kayıtsız kullanıcı.\nTelegram ID: `{uid}`",
-            parse_mode="Markdown"
-        )
         return
 
-    algılandi = is_donation_message(text, has_photo)
-
-    if algılandi:
+    if is_donation_message(text, has_photo):
         yeni = bagis_ekle(uid)
         if yeni:
             await update.message.reply_text(f"✅ @{name} bu haftaki bağışın kaydedildi!")
-        else:
-            await update.message.reply_text(f"ℹ️ @{name} zaten bu hafta bağış yapmışsın.")
-    else:
-        await update.message.reply_text(
-            f"🔍 Bağış algılanmadı.\nYazılan: `{text}`\nNormalize: `{normalize(text)}`",
-            parse_mode="Markdown"
-        )
 
 
 # =========================
@@ -506,3 +493,4 @@ schedule_jobs(app)
 
 print("✅ Bot başlatıldı.")
 app.run_polling()
+    
