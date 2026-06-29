@@ -502,4 +502,4 @@ schedule_jobs(app)
 
 print("✅ Bot başlatıldı.")
 app.run_polling()
-    
+                  
