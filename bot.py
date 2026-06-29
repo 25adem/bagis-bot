@@ -2,6 +2,7 @@ import os
 import re
 import sqlite3
 from datetime import datetime
+from rapidfuzz import fuzz
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
@@ -32,24 +33,50 @@ CREATE TABLE IF NOT EXISTS donations (
 
 conn.commit()
 
+# =========================
+# NORMALIZE (AI BENZERLİK İÇİN)
+# =========================
+def normalize(text):
+    text = text.lower()
+    text = re.sub(r"[^\w\s]", "", text)
+
+    replacements = {
+        "ı": "i",
+        "ğ": "g",
+        "ş": "s",
+        "ç": "c",
+        "ö": "o",
+        "ü": "u"
+    }
+
+    for k, v in replacements.items():
+        text = text.replace(k, v)
+
+    return text
+
 
 # =========================
-# SAFE BAĞIŞ ALGILAMA
+# AI GİBİ BAĞIŞ ALGILAMA
 # =========================
 def bagis_kontrol(text):
     if not text:
         return False
 
-    text = text.lower().strip()
+    text = normalize(text)
 
-    return text in [
-        "bağış yapıldı",
+    targets = [
         "bagis yapildi",
-        "bağış yaptım",
         "bagis yaptim",
-        "bağış gönderildi",
-        "bagis gonderildi"
+        "bagis gonderildi",
+        "haftanin bagisi"
     ]
+
+    for t in targets:
+        score = fuzz.partial_ratio(text, t)
+        if score >= 80:
+            return True
+
+    return False
 
 
 # =========================
@@ -82,7 +109,7 @@ async def mesaj(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_kaydet(uid, name)
 
-    text = update.message.text or ""
+    text = update.message.text or update.message.caption or ""
 
     if bagis_kontrol(text):
         bagis_ekle(uid)
@@ -98,7 +125,7 @@ async def rapor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     c.execute("SELECT user_id FROM donations")
     done = set([x[0] for x in c.fetchall()])
 
-    msg = "📊 HAFTALIK RAPOR\n\n"
+    msg = "📊 BAĞIŞ RAPORU\n\n"
 
     msg += "✔ YAPANLAR:\n"
     msg += "\n".join([u[1] for u in users if u[0] in done]) or "-"
@@ -126,7 +153,7 @@ async def uyeler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # START
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✅ Bot aktif ve stabil çalışıyor")
+    await update.message.reply_text("✅ AI Bağış Bot aktif")
 
 
 # =========================
@@ -137,7 +164,7 @@ app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("rapor", rapor))
 app.add_handler(CommandHandler("uyeler", uyeler))
-
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, mesaj))
+app.add_handler(MessageHandler(filters.PHOTO, mesaj))  # SS desteği
 
 app.run_polling()
