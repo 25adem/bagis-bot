@@ -8,37 +8,35 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 TOKEN = os.getenv("BOT_TOKEN")
 
 # =========================
-# DATABASE SETUP
+# DATABASE
 # =========================
 conn = sqlite3.connect("bot.db", check_same_thread=False)
 c = conn.cursor()
 
-c.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    name TEXT
-)
-""")
-
-c.execute("""
-CREATE TABLE IF NOT EXISTS donations (
-    user_id TEXT,
-    date TEXT
-)
-""")
-
+c.execute("CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT)")
+c.execute("CREATE TABLE IF NOT EXISTS donations (user_id TEXT, date TEXT)")
 conn.commit()
 
 # =========================
-# BAĞIŞ ALGILAMA
+# SADECE NET BAĞIŞ CÜMLELERİ
 # =========================
 def bagis_kontrol(text):
     if not text:
         return False
 
-    text = text.lower()
+    text = text.lower().strip()
 
-    return bool(re.search(r"(bağış|bagis).*(yap|yapt|gönd|att)", text))
+    # SADECE NET ONAY CÜMLELERİ
+    allowed = [
+        "bağış yapıldı",
+        "bagis yapildi",
+        "bağış yaptım",
+        "bagis yaptim",
+        "bağış gönderildi",
+        "bagis gonderildi"
+    ]
+
+    return text in allowed
 
 
 # =========================
@@ -53,13 +51,13 @@ def user_kaydet(uid, name):
 # BAĞIŞ KAYIT
 # =========================
 def bagis_ekle(uid):
-    now = datetime.now().strftime("%Y-%m-%d")
-    c.execute("INSERT INTO donations VALUES (?,?)", (uid, now))
+    today = datetime.now().strftime("%Y-%m-%d")
+    c.execute("INSERT INTO donations VALUES (?,?)", (uid, today))
     conn.commit()
 
 
 # =========================
-# MESAJ HANDLER
+# MESAJ
 # =========================
 async def mesaj(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
@@ -78,6 +76,26 @@ async def mesaj(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =========================
+# HAFTALIK UYARI (Pazar 18:00)
+# =========================
+async def pazar_uyari(context: ContextTypes.DEFAULT_TYPE):
+    c.execute("SELECT * FROM users")
+    users = c.fetchall()
+
+    c.execute("SELECT user_id FROM donations")
+    done = set([x[0] for x in c.fetchall()])
+
+    missing = [u for u in users if u[0] not in done]
+
+    msg = "⚠️ BUGÜN SON GÜN BAĞIŞI UNUTMAYIN ⚠️\n\n"
+
+    for u in missing:
+        msg += f"@{u[1]} bağış yapmayı unutma!\n"
+
+    await context.bot.send_message(chat_id=context.job.chat_id, text=msg)
+
+
+# =========================
 # RAPOR
 # =========================
 async def rapor(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -85,52 +103,15 @@ async def rapor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     users = c.fetchall()
 
     c.execute("SELECT user_id FROM donations")
-    done = [i[0] for i in c.fetchall()]
+    done = set([x[0] for x in c.fetchall()])
 
-    done_set = set(done)
-    all_set = set([u[0] for u in users])
-
-    missing = all_set - done_set
-
-    msg = "📊 HAFTALIK RAPOR\n\n"
+    msg = "📊 RAPOR\n\n"
 
     msg += "✔ YAPANLAR:\n"
-    msg += "\n".join([u[1] for u in users if u[0] in done_set]) or "-"
+    msg += "\n".join([u[1] for u in users if u[0] in done]) or "-"
 
     msg += "\n\n❌ YAPMAYANLAR:\n"
-    msg += "\n".join([u[1] for u in users if u[0] in missing]) or "-"
-
-    await update.message.reply_text(msg)
-
-
-# =========================
-# ÜYELER
-# =========================
-async def uyeler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    c.execute("SELECT * FROM users")
-    users = c.fetchall()
-
-    msg = "👥 ÜYELER\n\n"
-    msg += "\n".join([f"{u[1]} ({u[0]})" for u in users]) or "-"
-
-    await update.message.reply_text(msg)
-
-
-# =========================
-# AYLIK SAYAÇ
-# =========================
-async def aylik(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    c.execute("""
-    SELECT users.name, COUNT(donations.user_id)
-    FROM users
-    LEFT JOIN donations ON users.id = donations.user_id
-    GROUP BY users.id
-    """)
-
-    rows = c.fetchall()
-
-    msg = "📊 AYLIK BAĞIŞ SAYISI\n\n"
-    msg += "\n".join([f"{r[0]}: {r[1]}" for r in rows]) or "-"
+    msg += "\n".join([u[1] for u in users if u[0] not in done]) or "-"
 
     await update.message.reply_text(msg)
 
@@ -139,7 +120,7 @@ async def aylik(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # START
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Bot aktif (database sistemli)")
+    await update.message.reply_text("Bot aktif")
 
 
 # =========================
@@ -149,8 +130,24 @@ app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("rapor", rapor))
-app.add_handler(CommandHandler("uyeler", uyeler))
-app.add_handler(CommandHandler("aylik", aylik))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, mesaj))
+
+# =========================
+# SCHEDULER (Pazar 18:00)
+# =========================
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+scheduler = AsyncIOScheduler()
+
+scheduler.add_job(
+    pazar_uyari,
+    "cron",
+    day_of_week="sun",
+    hour=18,
+    minute=0,
+    args=[app]
+)
+
+scheduler.start()
 
 app.run_polling()
