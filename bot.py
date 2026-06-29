@@ -21,11 +21,15 @@ async def ekle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Eklendi")
 
 async def mesaj(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
+    if not update.message:
+        return
+
+    text = update.message.text
+    if not text:
         return
 
     user_id = str(update.message.from_user.id)
-    text = update.message.text.lower()
+    text = text.lower()
 
     if "bağış" in text:
         if not pazar_mi():
@@ -38,14 +42,9 @@ async def rapor(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = "HAFTALIK RAPOR\n\n"
 
-    msg += "YAPANLAR:\n"
-    msg += "\n".join(yapanlar) if yapanlar else "-"
-
-    msg += "\n\nYAPMAYANLAR:\n"
-    msg += "\n".join(yapmayanlar) if yapmayanlar else "-"
-
-    msg += "\n\nGEÇ YAPANLAR:\n"
-    msg += "\n".join(gec_yapanlar) if gec_yapanlar else "-"
+    msg += "YAPANLAR:\n" + ("\n".join(yapanlar) if yapanlar else "-")
+    msg += "\n\nYAPMAYANLAR:\n" + ("\n".join(yapmayanlar) if yapmayanlar else "-")
+    msg += "\n\nGEÇ YAPANLAR:\n" + ("\n".join(gec_yapanlar) if gec_yapanlar else "-")
 
     await update.message.reply_text(msg)
 
@@ -57,6 +56,6 @@ app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("ekle", ekle))
 app.add_handler(CommandHandler("rapor", rapor))
-app.add_handler(MessageHandler(filters.TEXT, mesaj))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, mesaj))
 
 app.run_polling()
