@@ -202,7 +202,7 @@ async def uyeler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Henüz kayıtlı üye yok.")
         return
     msg = f"👥 *KAYITLI ÜYELER ({len(users)} kişi)*\n\n"
-    msg += "\n".join([f"  {i+1}. {u[1]} (`{u[0]}`)" for i, u in enumerate(users)])
+    msg += "\n".join([f"  {i+1}. @{u[1]} (`{u[0]}`)" for i, u in enumerate(users)])
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -222,9 +222,9 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg += f"📊 Bu ay tekil bağışçı: {len(month_donors)}\n"
     msg += f"━━━━━━━━━━━━━━━━━━━━\n\n"
     msg += f"✅ *YAPANLAR:*\n"
-    msg += "\n".join([f"  • {u[1]} (`{u[0]}`)" for u in yapanlar]) if yapanlar else "  —"
+    msg += "\n".join([f"  • @{u[1]} (`{u[0]}`)" for u in yapanlar]) if yapanlar else "  —"
     msg += f"\n\n❌ *YAPMAYANLAR:*\n"
-    msg += "\n".join([f"  • {u[1]} (`{u[0]}`)" for u in yapmayanlar]) if yapmayanlar else "  —"
+    msg += "\n".join([f"  • @{u[1]} (`{u[0]}`)" for u in yapmayanlar]) if yapmayanlar else "  —"
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def uyeekle(update: Update, context: ContextTypes.DEFAULT_TYPE):
