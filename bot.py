@@ -145,10 +145,10 @@ async def mesaj(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text or update.message.caption or ""
     has_photo = bool(update.message.photo)
 
-    # Kayıtlı değilse işlem yapma
+    # Kayıtlı değilse otomatik ekle
     c.execute("SELECT 1 FROM users WHERE id=?", (uid,))
     if not c.fetchone():
-        return
+        user_kaydet(uid, name)
 
     if is_donation_message(text, has_photo):
         yeni = bagis_ekle(uid)
