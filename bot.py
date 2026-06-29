@@ -1,5 +1,4 @@
 import os
-import re
 import sqlite3
 from datetime import datetime
 from telegram import Update
@@ -17,8 +16,9 @@ c.execute("CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS donations (user_id TEXT, date TEXT)")
 conn.commit()
 
+
 # =========================
-# SADECE NET BAĞIŞ CÜMLELERİ
+# BAĞIŞ KONTROL (SADECE NET)
 # =========================
 def bagis_kontrol(text):
     if not text:
@@ -26,8 +26,7 @@ def bagis_kontrol(text):
 
     text = text.lower().strip()
 
-    # SADECE NET ONAY CÜMLELERİ
-    allowed = [
+    return text in [
         "bağış yapıldı",
         "bagis yapildi",
         "bağış yaptım",
@@ -35,8 +34,6 @@ def bagis_kontrol(text):
         "bağış gönderildi",
         "bagis gonderildi"
     ]
-
-    return text in allowed
 
 
 # =========================
@@ -47,9 +44,6 @@ def user_kaydet(uid, name):
     conn.commit()
 
 
-# =========================
-# BAĞIŞ KAYIT
-# =========================
 def bagis_ekle(uid):
     today = datetime.now().strftime("%Y-%m-%d")
     c.execute("INSERT INTO donations VALUES (?,?)", (uid, today))
@@ -65,34 +59,13 @@ async def mesaj(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.message.from_user
     uid = str(user.id)
-    name = user.username or user.first_name
 
-    user_kaydet(uid, name)
+    user_kaydet(uid, user.username or user.first_name)
 
     text = update.message.text or ""
 
     if bagis_kontrol(text):
         bagis_ekle(uid)
-
-
-# =========================
-# HAFTALIK UYARI (Pazar 18:00)
-# =========================
-async def pazar_uyari(context: ContextTypes.DEFAULT_TYPE):
-    c.execute("SELECT * FROM users")
-    users = c.fetchall()
-
-    c.execute("SELECT user_id FROM donations")
-    done = set([x[0] for x in c.fetchall()])
-
-    missing = [u for u in users if u[0] not in done]
-
-    msg = "⚠️ BUGÜN SON GÜN BAĞIŞI UNUTMAYIN ⚠️\n\n"
-
-    for u in missing:
-        msg += f"@{u[1]} bağış yapmayı unutma!\n"
-
-    await context.bot.send_message(chat_id=context.job.chat_id, text=msg)
 
 
 # =========================
@@ -117,6 +90,27 @@ async def rapor(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =========================
+# Pazar 18:00 UYARI (DOĞRU YÖNTEM)
+# =========================
+async def pazar_uyari(context: ContextTypes.DEFAULT_TYPE):
+    c.execute("SELECT * FROM users")
+    users = c.fetchall()
+
+    c.execute("SELECT user_id FROM donations")
+    done = set([x[0] for x in c.fetchall()])
+
+    missing = [u for u in users if u[0] not in done]
+
+    msg = "⚠️ SON GÜN UYARISI ⚠️\n\n"
+
+    for u in missing:
+        msg += f"@{u[1]} bağış yapmayı unutma!\n"
+
+    # grup id otomatik context.chat_id değil, sabit koyman gerekir
+    await context.bot.send_message(chat_id=context.job.chat_id, text=msg)
+
+
+# =========================
 # START
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -124,7 +118,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =========================
-# BOT
+# BOT SETUP
 # =========================
 app = ApplicationBuilder().token(TOKEN).build()
 
@@ -132,22 +126,17 @@ app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("rapor", rapor))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, mesaj))
 
-# =========================
-# SCHEDULER (Pazar 18:00)
-# =========================
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-scheduler = AsyncIOScheduler()
+# =========================
+# JOB QUEUE (CRASHSIZ SİSTEM)
+# =========================
+job_queue = app.job_queue
 
-scheduler.add_job(
+job_queue.run_daily(
     pazar_uyari,
-    "cron",
-    day_of_week="sun",
-    hour=18,
-    minute=0,
-    args=[app]
+    time=datetime.strptime("18:00", "%H:%M").time(),
+    days=(6,),  # Sunday
+    chat_id=YOUR_GROUP_ID  # BURAYA GRUP ID YAZMALISIN
 )
-
-scheduler.start()
 
 app.run_polling()
