@@ -5,60 +5,62 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-members = set()
-done = set()
-late = set()
+uyeler = set()
+yapanlar = set()
+gec_yapanlar = set()
 
-def is_sunday():
+def pazar_mi():
     return datetime.now().weekday() == 6
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Bot is active!")
+    await update.message.reply_text("Bot aktif!")
 
-async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.args:
-        members.add(context.args[0])
-        await update.message.reply_text("Added")
+# Grupta yazan herkesi otomatik ekler
+async def kayit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message:
+        uyeler.add(str(update.message.from_user.id))
 
-async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Bağış kontrol
+async def mesaj(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
 
     user_id = str(update.message.from_user.id)
     text = update.message.text.lower()
 
-    if "donation" in text or "bağış" in text:
-        if not is_sunday():
-            done.add(user_id)
+    uyeler.add(user_id)
+
+    if "bağış" in text:
+        if not pazar_mi():
+            yapanlar.add(user_id)
         else:
-            late.add(user_id)
+            gec_yapanlar.add(user_id)
 
-async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    missing = members - done
+# Rapor
+async def rapor(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    yapmayanlar = uyeler - yapanlar
 
-    msg = "WEEKLY REPORT\n\n"
+    msg = "📊 HAFTALIK RAPOR\n\n"
 
-    msg += "DONE:\n"
-    msg += "\n".join(done) if done else "-"
+    msg += "✔ YAPANLAR:\n"
+    msg += "\n".join(yapanlar) if yapanlar else "-"
 
-    msg += "\n\nMISSING:\n"
-    msg += "\n".join(missing) if missing else "-"
+    msg += "\n\n❌ YAPMAYANLAR:\n"
+    msg += "\n".join(yapmayanlar) if yapmayanlar else "-"
 
-    msg += "\n\nLATE:\n"
-    msg += "\n".join(late) if late else "-"
+    msg += "\n\n⚠ GEÇ YAPANLAR:\n"
+    msg += "\n".join(gec_yapanlar) if gec_yapanlar else "-"
 
     await update.message.reply_text(msg)
 
-    done.clear()
-    late.clear()
+    yapanlar.clear()
+    gec_yapanlar.clear()
 
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("add", add))
-app.add_handler(CommandHandler("report", report))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+app.add_handler(CommandHandler("rapor", rapor))
+app.add_handler(MessageHandler(filters.ALL, kayit))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, mesaj))
 
-# IMPORTANT FIX FOR RAILWAY
-if __name__ == "__main__":
-    app.run_polling(drop_pending_updates=True)
+app.run_polling()
