@@ -457,16 +457,25 @@ async def haftalik_sifirla(context: ContextTypes.DEFAULT_TYPE):
 def schedule_jobs(app):
     jq: JobQueue = app.job_queue
 
+    # Pazar 18:00 — yapmayanlara etiketli uyarı
     jq.run_daily(
         pazar_hatirlatma,
-        time=datetime.strptime("20:00", "%H:%M").replace(tzinfo=TZ).timetz(),
+        time=datetime.strptime("18:00", "%H:%M").replace(tzinfo=TZ).timetz(),
         days=(6,)
     )
 
+    # Pazar 23:50 — son raporu adminlere ve gruba gönder
+    jq.run_daily(
+        haftalik_rapor_gonder,
+        time=datetime.strptime("23:50", "%H:%M").replace(tzinfo=TZ).timetz(),
+        days=(6,)
+    )
+
+    # Pazartesi 00:00 — haftalık sıfırla
     jq.run_daily(
         haftalik_sifirla,
-        time=datetime.strptime("23:59", "%H:%M").replace(tzinfo=TZ).timetz(),
-        days=(6,)
+        time=datetime.strptime("00:00", "%H:%M").replace(tzinfo=TZ).timetz(),
+        days=(0,)
     )
 
 
