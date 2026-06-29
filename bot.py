@@ -4,6 +4,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 from datetime import datetime
 
 TOKEN = os.getenv("BOT_TOKEN")
+print("TOKEN DEBUG:", repr(TOKEN))
 
 tum_uyeler = set()
 yapanlar = set()
