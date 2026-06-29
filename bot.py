@@ -82,28 +82,35 @@ def get_month_donors(month=None):
 # =========================
 # BAĞIŞ ALGILAMA
 # =========================
-BAGIS_PATTERN = re.compile(
-    r"(bağış|bagis|ba[gğ][iı]s)",
-    re.IGNORECASE | re.UNICODE
-)
 BAGIS_KEYWORDS = [
     "bağış yapıldı", "bağış yapılmıştır", "haftanın bağışı",
     "bagis yapildi", "bagis yapilmistir", "haftanin bagisi",
     "bağışımı yaptım", "bağışımı gönderdim", "bağış attım",
-    "bağış yaptım", "haftalık bağış", "haftalik bagis"
+    "bağış yaptım", "haftalık bağış", "haftalik bagis",
+    "bağışı yaptım", "bağışı attım", "bağışı gönderdim",
+    "haftanın bağışını yaptım", "haftanın bağışını attım",
+    "bağışımı attım", "bağış yapıldı", "bagışımı yaptım"
 ]
+
+def normalize(text):
+    """Türkçe karakter sorunu olmadan karşılaştırma için"""
+    replacements = {
+        'İ': 'i', 'I': 'i', 'Ğ': 'ğ', 'Ü': 'ü',
+        'Ş': 'ş', 'Ö': 'ö', 'Ç': 'ç',
+        'i': 'i', 'ğ': 'ğ', 'ü': 'ü', 'ş': 'ş', 'ö': 'ö', 'ç': 'ç'
+    }
+    result = ""
+    for ch in text:
+        result += replacements.get(ch, ch.lower())
+    return result
 
 def is_donation_message(text, has_photo):
     if not text and not has_photo:
         return False
     if text:
-        text_lower = text.lower()
+        t = normalize(text)
         for kw in BAGIS_KEYWORDS:
-            if kw in text_lower:
-                return True
-        if BAGIS_PATTERN.search(text_lower):
-            action = re.search(r"(yap|yapt|gönd|gond|att|gönder|yaptım|yaptim|yapıldı|yapildi|yapılmıştır|yapilmistir)", text_lower)
-            if action:
+            if normalize(kw) in t:
                 return True
     return False
 
@@ -531,4 +538,4 @@ schedule_jobs(app)
 
 print("✅ Bot başlatıldı.")
 app.run_polling()
-        
+    
