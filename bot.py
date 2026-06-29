@@ -9,17 +9,21 @@ uyeler = {}
 haftalik = set()
 aylik = {}
 
+# 🔥 BAĞIŞ KONTROL
 def bagis_kontrol(text):
     if not text:
         return False
+
     text = text.lower()
-    return re.search(r"(bağış|bagis).*(yapıldı|yapildi|yaptım|yaptim)", text)
+    return "bağış" in text or "bagis" in text
 
 
+# START
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Bot aktif")
 
 
+# 🔥 TÜM MESAJLARI YAKALA (EN KRİTİK FIX)
 async def mesaj(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
@@ -27,6 +31,7 @@ async def mesaj(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     uid = str(user.id)
 
+    # ✔ HERKESİ KAYDET (KESİN)
     uyeler[uid] = user.username or user.first_name
 
     text = update.message.text or ""
@@ -36,6 +41,7 @@ async def mesaj(update: Update, context: ContextTypes.DEFAULT_TYPE):
         aylik[uid] = aylik.get(uid, 0) + 1
 
 
+# 📊 RAPOR
 async def rapor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tum = set(uyeler.keys())
     yapmayan = tum - haftalik
@@ -51,16 +57,12 @@ async def rapor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg)
 
 
-async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    haftalik.clear()
-    await update.message.reply_text("Reset atıldı")
-
-
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("rapor", rapor))
-app.add_handler(CommandHandler("reset", reset))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, mesaj))
+
+# 🔥 EN ÖNEMLİ SATIR (HER MESAJ)
+app.add_handler(MessageHandler(filters.ALL, mesaj))
 
 app.run_polling()
