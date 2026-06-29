@@ -163,9 +163,9 @@ async def hafta(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = f"📊 *{get_week_key()} — HAFTALIK DURUM*\n\n"
     msg += f"✅ *YAPANLAR ({len(yapanlar)}/{len(users)}):*\n"
-    msg += "\n".join([f"  • {u[1]}" for u in yapanlar]) if yapanlar else "  —"
+    msg += "\n".join([f"  • @{u[1]}" for u in yapanlar]) if yapanlar else "  —"
     msg += f"\n\n❌ *YAPMAYANLAR ({len(yapmayanlar)}):*\n"
-    msg += "\n".join([f"  • {u[1]}" for u in yapmayanlar]) if yapmayanlar else "  —"
+    msg += "\n".join([f"  • @{u[1]}" for u in yapmayanlar]) if yapmayanlar else "  —"
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def ay(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -191,9 +191,9 @@ async def rapor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = f"📋 *DETAYLI HAFTALIK RAPOR*\n"
     msg += f"📅 Hafta: {get_week_key()} | 📈 %{yuzde}\n\n"
     msg += f"✅ *YAPANLAR:*\n"
-    msg += "\n".join([f"  {i+1}. {u[1]}" for i, u in enumerate(yapanlar)]) if yapanlar else "  —"
+    msg += "\n".join([f"  {i+1}. @{u[1]}" for i, u in enumerate(yapanlar)]) if yapanlar else "  —"
     msg += f"\n\n❌ *YAPMAYANLAR:*\n"
-    msg += "\n".join([f"  {i+1}. {u[1]}" for i, u in enumerate(yapmayanlar)]) if yapmayanlar else "  —"
+    msg += "\n".join([f"  {i+1}. @{u[1]}" for i, u in enumerate(yapmayanlar)]) if yapmayanlar else "  —"
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def uyeler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -202,7 +202,7 @@ async def uyeler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Henüz kayıtlı üye yok.")
         return
     msg = f"👥 *KAYITLI ÜYELER ({len(users)} kişi)*\n\n"
-    msg += "\n".join([f"  {i+1}. @{u[1]} (`{u[0]}`)" for i, u in enumerate(users)])
+    msg += "\n".join([f"  {i+1}. {u[1]} (`{u[0]}`)" for i, u in enumerate(users)])
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -315,7 +315,7 @@ async def pazar_hatirlatma(context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    etiketler = " ".join([f"[{u[1]}](tg://user?id={u[0]})" for u in yapmayanlar])
+    etiketler = " ".join([f"@{u[1]}" for u in yapmayanlar])
     msg = (
         f"⏰ *HATIRLATMA — Bugün Son Gün!*\n\n"
         f"Bağışını henüz yapmayan üyeler:\n{etiketler}\n\n"
@@ -338,9 +338,9 @@ async def haftalik_rapor_gonder(context: ContextTypes.DEFAULT_TYPE):
         f"📋 *{week} — HAFTA SONU RAPORU*\n"
         f"📈 Tamamlama: {len(yapanlar)}/{len(users)} (%{yuzde})\n\n"
         f"✅ Bağış Yapanlar ({len(yapanlar)}):\n"
-        + ("\n".join([f"  • {u[1]}" for u in yapanlar]) or "  —")
+        + ("\n".join([f"  • @{u[1]}" for u in yapanlar]) or "  —")
         + f"\n\n❌ Bağış Yapmayanlar ({len(yapmayanlar)}):\n"
-        + ("\n".join([f"  • {u[1]}" for u in yapmayanlar]) or "  —")
+        + ("\n".join([f"  • @{u[1]}" for u in yapmayanlar]) or "  —")
     )
 
     now = datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
