@@ -6,19 +6,29 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-uyeler = {}        # user_id -> username
+uyeler = {}        
 yapanlar = set()
 gec_yapanlar = set()
 
-# 🔥 BAĞIŞ KONTROL (PRO MAX)
+
+# 🔥 BAĞIŞ ALGILAMA (ULTRA ESNEK)
 def bagis_kontrol(text):
     if not text:
         return False
 
-    text = text.lower().strip()
+    text = text.lower()
 
-    # bağış / bagis + yapıldı / yapildi (esnek)
-    return re.search(r"(bağış|bagis).*(yapıldı|yapildi)", text) is not None
+    # tüm ihtimaller
+    anahtarlar = [
+        "bağış yapıldı",
+        "bagis yapildi",
+        "bağış yaptım",
+        "bagis yaptim",
+        "bağış yaptık",
+        "bagis yaptik"
+    ]
+
+    return any(k in text for k in anahtarlar)
 
 
 def pazar_mi():
@@ -26,27 +36,32 @@ def pazar_mi():
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("📢 Bot aktif!")
+    await update.message.reply_text("✅ Bot aktif!")
 
 
-# kullanıcı kaydı + bağış kontrol
+# 🔥 ANA MESAJ HANDLER
 async def mesaj(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
 
+    print("MESAJ GELDİ")  # log için
+
     user = update.message.from_user
     uid = str(user.id)
 
-    uyeler[uid] = user.username or "no_username"
+    # kayıt
+    uyeler[uid] = user.username or user.first_name
 
-    text = update.message.text
+    text = update.message.text or ""
 
-    # 🔥 BAĞIŞ SAYMA
+    # 🔥 BAĞIŞ TESPİT
     if bagis_kontrol(text):
         if not pazar_mi():
             yapanlar.add(uid)
+            print(f"BAĞIŞ SAYILDI: {uid}")
         else:
             gec_yapanlar.add(uid)
+            print(f"GEÇ BAĞIŞ: {uid}")
 
 
 # 📊 RAPOR
@@ -57,25 +72,32 @@ async def rapor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = "📊 HAFTALIK BAĞIŞ RAPORU\n\n"
 
     msg += "✔ YAPANLAR:\n"
-    msg += "\n".join([f"@{uyeler[i]} ({i})" for i in yapanlar]) if yapanlar else "-"
+    msg += "\n".join([f"@{uyeler[i]}" for i in yapanlar]) if yapanlar else "-"
 
     msg += "\n\n❌ YAPMAYANLAR:\n"
-    msg += "\n".join([f"@{uyeler[i]} ({i})" for i in yapmayanlar]) if yapmayanlar else "-"
+    msg += "\n".join([f"@{uyeler[i]}" for i in yapmayanlar]) if yapmayanlar else "-"
 
     msg += "\n\n⚠ GEÇ YAPANLAR:\n"
-    msg += "\n".join([f"@{uyeler[i]} ({i})" for i in gec_yapanlar]) if gec_yapanlar else "-"
+    msg += "\n".join([f"@{uyeler[i]}" for i in gec_yapanlar]) if gec_yapanlar else "-"
 
     await update.message.reply_text(msg)
 
-    # 🔄 RESET
+
+# 🔄 MANUEL RESET
+async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     yapanlar.clear()
     gec_yapanlar.clear()
+    await update.message.reply_text("♻️ Liste sıfırlandı!")
 
 
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("rapor", rapor))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, mesaj))
+app.add_handler(CommandHandler("reset", reset))
 
+# 🔥 EN KRİTİK SATIR
+app.add_handler(MessageHandler(filters.TEXT, mesaj))
+
+print("BOT ÇALIŞIYOR...")
 app.run_polling()
