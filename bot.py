@@ -16,11 +16,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Bot aktif!")
 
 async def ekle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if len(context.args) > 0:
+    if context.args:
         tum_uyeler.add(context.args[0])
         await update.message.reply_text("Eklendi")
 
 async def mesaj(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+
     user_id = str(update.message.from_user.id)
     text = update.message.text.lower()
 
@@ -36,16 +39,13 @@ async def rapor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = "HAFTALIK RAPOR\n\n"
 
     msg += "YAPANLAR:\n"
-    for x in yapanlar:
-        msg += x + "\n"
+    msg += "\n".join(yapanlar) if yapanlar else "-"
 
-    msg += "\nYAPMAYANLAR:\n"
-    for x in yapmayanlar:
-        msg += x + "\n"
+    msg += "\n\nYAPMAYANLAR:\n"
+    msg += "\n".join(yapmayanlar) if yapmayanlar else "-"
 
-    msg += "\nGEÇ YAPANLAR:\n"
-    for x in gec_yapanlar:
-        msg += x + "\n"
+    msg += "\n\nGEÇ YAPANLAR:\n"
+    msg += "\n".join(gec_yapanlar) if gec_yapanlar else "-"
 
     await update.message.reply_text(msg)
 
