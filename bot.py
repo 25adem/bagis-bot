@@ -3,7 +3,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from datetime import datetime
 
-TOKEN = os.getenv("8751708215:AAGdiDXRGgC9kGw8q1eIaupPtr2V7kpFnsk")
+TOKEN = os.getenv("BOT_TOKEN")
 
 tum_uyeler = set()
 yapanlar = set()
