@@ -17,7 +17,9 @@ TZ = pytz.timezone("Europe/Istanbul")
 # =========================
 # DATABASE
 # =========================
-conn = sqlite3.connect("bot.db", check_same_thread=False)
+# Kalıcı veri için Volume varsa /app/data kullan, yoksa normal klasör
+DB_PATH = os.path.join(os.getenv("DATA_DIR", "."), "bot.db")
+conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 c = conn.cursor()
 
 c.execute("""CREATE TABLE IF NOT EXISTS users (
@@ -79,6 +81,14 @@ def get_month_donors(month=None):
 # =========================
 # BAGIS ALGILAMA
 # =========================
+def md_safe(text):
+    """Markdown'ı kıran özel karakterleri temizler (kullanıcı adlarında güvenli gösterim için)"""
+    if not text:
+        return text
+    for ch in ['_', '*', '`', '[', ']']:
+        text = text.replace(ch, '')
+    return text
+
 def normalize(text):
     replacements = {
         'I': 'i', 'İ': 'i', 'Ğ': 'g', 'Ü': 'u',
@@ -150,7 +160,7 @@ async def mesaj(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_donation_message(text, has_photo):
         yeni = bagis_ekle(uid)
         if yeni:
-            await update.message.reply_text(f"✅ @{name} bu haftaki bağışın kaydedildi!")
+            await update.message.reply_text(f"✅ @{md_safe(name)} bu haftaki bağışın kaydedildi!")
 
 # =========================
 # KOMUTLAR
@@ -184,9 +194,9 @@ async def hafta(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = f"📊 *{get_week_key()} — HAFTALIK DURUM*\n\n"
     msg += f"✅ *YAPANLAR ({len(yapanlar)}/{len(users)}):*\n"
-    msg += "\n".join([f"  • @{u[1]}" for u in yapanlar]) if yapanlar else "  —"
+    msg += "\n".join([f"  • @{md_safe(u[1])}" for u in yapanlar]) if yapanlar else "  —"
     msg += f"\n\n❌ *YAPMAYANLAR ({len(yapmayanlar)}):*\n"
-    msg += "\n".join([f"  • @{u[1]}" for u in yapmayanlar]) if yapmayanlar else "  —"
+    msg += "\n".join([f"  • @{md_safe(u[1])}" for u in yapmayanlar]) if yapmayanlar else "  —"
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def ay(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -201,7 +211,7 @@ async def ay(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for u in users:
         sayi = rows.get(u[0], 0)
         emoji = "✅" if sayi > 0 else "❌"
-        msg += f"{emoji} {u[1]}: {sayi} bağış\n"
+        msg += f"{emoji} {md_safe(u[1])}: {sayi} bağış\n"
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def rapor(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -216,9 +226,9 @@ async def rapor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = f"📋 *DETAYLI HAFTALIK RAPOR*\n"
     msg += f"📅 Hafta: {get_week_key()} | 📈 %{yuzde}\n\n"
     msg += f"✅ *YAPANLAR:*\n"
-    msg += "\n".join([f"  {i+1}. @{u[1]}" for i, u in enumerate(yapanlar)]) if yapanlar else "  —"
+    msg += "\n".join([f"  {i+1}. @{md_safe(u[1])}" for i, u in enumerate(yapanlar)]) if yapanlar else "  —"
     msg += f"\n\n❌ *YAPMAYANLAR:*\n"
-    msg += "\n".join([f"  {i+1}. @{u[1]}" for i, u in enumerate(yapmayanlar)]) if yapmayanlar else "  —"
+    msg += "\n".join([f"  {i+1}. @{md_safe(u[1])}" for i, u in enumerate(yapmayanlar)]) if yapmayanlar else "  —"
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def uyeler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -229,7 +239,7 @@ async def uyeler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Henüz kayıtlı üye yok.")
         return
     msg = f"👥 *KAYITLI ÜYELER ({len(users)} kişi)*\n\n"
-    msg += "\n".join([f"  {i+1}. @{u[1]} (`{u[0]}`)" for i, u in enumerate(users)])
+    msg += "\n".join([f"  {i+1}. @{md_safe(u[1])} (`{u[0]}`)" for i, u in enumerate(users)])
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -248,9 +258,9 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg += f"📊 Bu ay tekil bağışçı: {len(month_donors)}\n"
     msg += f"━━━━━━━━━━━━━━━━━━━━\n\n"
     msg += f"✅ *YAPANLAR:*\n"
-    msg += "\n".join([f"  • @{u[1]} (`{u[0]}`)" for u in yapanlar]) if yapanlar else "  —"
+    msg += "\n".join([f"  • @{md_safe(u[1])} (`{u[0]}`)" for u in yapanlar]) if yapanlar else "  —"
     msg += f"\n\n❌ *YAPMAYANLAR:*\n"
-    msg += "\n".join([f"  • @{u[1]} (`{u[0]}`)" for u in yapmayanlar]) if yapmayanlar else "  —"
+    msg += "\n".join([f"  • @{md_safe(u[1])} (`{u[0]}`)" for u in yapmayanlar]) if yapmayanlar else "  —"
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def uyeekle(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -262,7 +272,7 @@ async def uyeekle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     uid, name = args[0], " ".join(args[1:])
     user_kaydet(uid, name)
-    await update.message.reply_text(f"✅ {name} (`{uid}`) eklendi.", parse_mode="Markdown")
+    await update.message.reply_text(f"✅ {md_safe(name)} (`{uid}`) eklendi.", parse_mode="Markdown")
 
 async def uyesil(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id):
@@ -371,7 +381,7 @@ async def pazar_hatirlatma(context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    etiketler = " ".join([f"@{u[1]}" for u in yapmayanlar])
+    etiketler = " ".join([f"@{md_safe(u[1])}" for u in yapmayanlar])
     msg = (
         f"⏰ *HATIRLATMA — Bugün Son Gün!*\n\n"
         f"Bağışını henüz yapmayan üyeler:\n{etiketler}\n\n"
@@ -394,19 +404,19 @@ async def haftalik_rapor_gonder(context: ContextTypes.DEFAULT_TYPE):
         f"📋 *{week} — HAFTA SONU RAPORU*\n"
         f"📈 Tamamlama: {len(yapanlar)}/{len(users)} (%{yuzde})\n\n"
         f"✅ Bağış Yapanlar ({len(yapanlar)}):\n"
-        + ("\n".join([f"  • @{u[1]}" for u in yapanlar]) or "  —")
+        + ("\n".join([f"  • @{md_safe(u[1])}" for u in yapanlar]) or "  —")
         + f"\n\n❌ Bağış Yapmayanlar ({len(yapmayanlar)}):\n"
-        + ("\n".join([f"  • @{u[1]}" for u in yapmayanlar]) or "  —")
+        + ("\n".join([f"  • @{md_safe(u[1])}" for u in yapmayanlar]) or "  —")
     )
 
     now = datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
     c.execute("INSERT OR REPLACE INTO weekly_snapshots VALUES (?,?,?)", (week, snapshot, now))
     conn.commit()
 
-    for admin_id in ADMIN_IDS:
+    for admin_id in get_all_admins():
         try:
             await context.bot.send_message(
-                chat_id=admin_id,
+                chat_id=int(admin_id),
                 text="🔔 *Pazar 23:50 — Haftalık Son Rapor:*\n\n" + snapshot,
                 parse_mode="Markdown"
             )
@@ -417,10 +427,10 @@ async def haftalik_rapor_gonder(context: ContextTypes.DEFAULT_TYPE):
 # PAZARTESİ 00:00 — SIFIRLA
 # =========================
 async def haftalik_sifirla(context: ContextTypes.DEFAULT_TYPE):
-    for admin_id in ADMIN_IDS:
+    for admin_id in get_all_admins():
         try:
             await context.bot.send_message(
-                chat_id=admin_id,
+                chat_id=int(admin_id),
                 text="🔄 *Yeni hafta başladı!* Bağış takibi sıfırlandı.",
                 parse_mode="Markdown"
             )
@@ -480,4 +490,4 @@ schedule_jobs(app)
 
 print("✅ Bot başlatıldı.")
 app.run_polling()
-    
+                    
