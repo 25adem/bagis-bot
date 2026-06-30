@@ -32,6 +32,15 @@ c.execute("""CREATE TABLE IF NOT EXISTS weekly_snapshots (
     week TEXT PRIMARY KEY, snapshot TEXT, created_at TEXT
 )""")
 
+c.execute("""CREATE TABLE IF NOT EXISTS admins (
+    id TEXT PRIMARY KEY, added_date TEXT
+)""")
+
+conn.commit()
+
+# .env'deki ADMIN_IDS'i ilk admin olarak DB'ye ekle (ilk kurulum için)
+for aid in ADMIN_IDS:
+    c.execute("INSERT OR IGNORE INTO admins VALUES (?,?)", (str(aid), datetime.now(TZ).strftime("%Y-%m-%d")))
 conn.commit()
 
 # =========================
@@ -44,7 +53,12 @@ def get_month_key():
     return datetime.now(TZ).strftime("%Y-%m")
 
 def is_admin(uid):
-    return uid in ADMIN_IDS
+    c.execute("SELECT 1 FROM admins WHERE id=?", (str(uid),))
+    return c.fetchone() is not None
+
+def get_all_admins():
+    c.execute("SELECT id FROM admins")
+    return [row[0] for row in c.fetchall()]
 
 def get_all_users():
     c.execute("SELECT id, name FROM users ORDER BY name")
@@ -85,13 +99,15 @@ BAGIS_KEYWORDS = [
 ]
 
 def is_donation_message(text, has_photo):
-    if not text and not has_photo:
+    # SS (fotoğraf) zorunlu - sadece yazı ile kayıt olmaz
+    if not has_photo:
         return False
-    if text:
-        t = normalize(text)
-        for kw in BAGIS_KEYWORDS:
-            if kw in t:
-                return True
+    if not text:
+        return False
+    t = normalize(text)
+    for kw in BAGIS_KEYWORDS:
+        if kw in t:
+            return True
     return False
 
 # =========================
@@ -151,11 +167,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/uyesil [id]\n"
         "/bagisekle [id]\n"
         "/bagissil [id]\n"
-        "/sifirla",
+        "/sifirla\n"
+        "/adminekle [id]\n"
+        "/adminsil [id]\n"
+        "/adminler",
         parse_mode="Markdown"
     )
 
 async def hafta(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id):
+        return  # Sessizce yoksay
     users = get_all_users()
     donors = get_week_donors()
     yapanlar = [u for u in users if u[0] in donors]
@@ -169,6 +190,8 @@ async def hafta(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def ay(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id):
+        return  # Sessizce yoksay
     users = get_all_users()
     month = get_month_key()
     c.execute("SELECT user_id, COUNT(*) FROM donations WHERE month=? GROUP BY user_id", (month,))
@@ -182,6 +205,8 @@ async def ay(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def rapor(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id):
+        return  # Sessizce yoksay
     users = get_all_users()
     donors = get_week_donors()
     yapanlar = [u for u in users if u[0] in donors]
@@ -197,6 +222,8 @@ async def rapor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 async def uyeler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id):
+        return  # Sessizce yoksay
     users = get_all_users()
     if not users:
         await update.message.reply_text("Henüz kayıtlı üye yok.")
@@ -207,8 +234,7 @@ async def uyeler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id):
-        await update.message.reply_text("⛔ Yetkisiz.")
-        return
+        return  # Sessizce yoksay
 
     users = get_all_users()
     week_donors = get_week_donors()
@@ -229,8 +255,7 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def uyeekle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id):
-        await update.message.reply_text("⛔ Yetkisiz.")
-        return
+        return  # Sessizce yoksay
     args = context.args
     if len(args) < 2:
         await update.message.reply_text("Kullanım: /uyeekle [id] [isim]")
@@ -241,8 +266,7 @@ async def uyeekle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def uyesil(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id):
-        await update.message.reply_text("⛔ Yetkisiz.")
-        return
+        return  # Sessizce yoksay
     args = context.args
     if not args:
         await update.message.reply_text("Kullanım: /uyesil [id]")
@@ -260,8 +284,7 @@ async def uyesil(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def bagisekle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id):
-        await update.message.reply_text("⛔ Yetkisiz.")
-        return
+        return  # Sessizce yoksay
     args = context.args
     if not args:
         await update.message.reply_text("Kullanım: /bagisekle [id]")
@@ -280,8 +303,7 @@ async def bagisekle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def bagissil(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id):
-        await update.message.reply_text("⛔ Yetkisiz.")
-        return
+        return  # Sessizce yoksay
     args = context.args
     if not args:
         await update.message.reply_text("Kullanım: /bagissil [id]")
@@ -293,10 +315,44 @@ async def bagissil(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def sifirla(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id):
-        await update.message.reply_text("⛔ Yetkisiz.")
-        return
+        return  # Sessizce yoksay
     await haftalik_rapor_gonder(context)
     await update.message.reply_text("✅ Rapor gönderildi ve hafta sıfırlandı.")
+
+async def adminekle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id):
+        return  # Sessizce yoksay
+    args = context.args
+    if not args:
+        await update.message.reply_text("Kullanım: /adminekle [telegram_id]")
+        return
+    uid = args[0]
+    c.execute("INSERT OR IGNORE INTO admins VALUES (?,?)", (uid, datetime.now(TZ).strftime("%Y-%m-%d")))
+    conn.commit()
+    await update.message.reply_text(f"✅ `{uid}` admin olarak eklendi.", parse_mode="Markdown")
+
+async def adminsil(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id):
+        return  # Sessizce yoksay
+    args = context.args
+    if not args:
+        await update.message.reply_text("Kullanım: /adminsil [telegram_id]")
+        return
+    uid = args[0]
+    if len(get_all_admins()) <= 1:
+        await update.message.reply_text("⚠️ Son admini silemezsin.")
+        return
+    c.execute("DELETE FROM admins WHERE id=?", (uid,))
+    conn.commit()
+    await update.message.reply_text(f"🗑 `{uid}` admin listesinden çıkarıldı.", parse_mode="Markdown")
+
+async def adminler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id):
+        return  # Sessizce yoksay
+    admins = get_all_admins()
+    msg = f"🛡 *ADMİNLER ({len(admins)} kişi)*\n\n"
+    msg += "\n".join([f"  • `{a}`" for a in admins])
+    await update.message.reply_text(msg, parse_mode="Markdown")
 
 # =========================
 # PAZAR 18:00 — ETİKETLİ UYARI
@@ -414,6 +470,9 @@ app.add_handler(CommandHandler("uyesil", uyesil))
 app.add_handler(CommandHandler("bagisekle", bagisekle))
 app.add_handler(CommandHandler("bagissil", bagissil))
 app.add_handler(CommandHandler("sifirla", sifirla))
+app.add_handler(CommandHandler("adminekle", adminekle))
+app.add_handler(CommandHandler("adminsil", adminsil))
+app.add_handler(CommandHandler("adminler", adminler))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, mesaj))
 app.add_handler(MessageHandler(filters.PHOTO, mesaj))
 
