@@ -18,7 +18,9 @@ TZ = pytz.timezone("Europe/Istanbul")
 # DATABASE
 # =========================
 # Kalıcı veri için Volume varsa /app/data kullan, yoksa normal klasör
-DB_PATH = os.path.join(os.getenv("DATA_DIR", "."), "bot.db")
+DATA_DIR = os.getenv("DATA_DIR", ".")
+os.makedirs(DATA_DIR, exist_ok=True)  # Klasör yoksa oluştur
+DB_PATH = os.path.join(DATA_DIR, "bot.db")
 conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 c = conn.cursor()
 
@@ -490,4 +492,4 @@ schedule_jobs(app)
 
 print("✅ Bot başlatıldı.")
 app.run_polling()
-                    
+    
